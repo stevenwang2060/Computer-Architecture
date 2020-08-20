@@ -10,15 +10,20 @@ class CPU:
         self.ram = [0] * 256 # The memory storage for the RAM.
         self.reg = [0] * 8   # 8 new registers.
         self.pc = 0          # The program counter.
+        self.sp = 7          # Stack pointer.
         self.op_size = 1
         self.running = True
 
-        # The instruction handlers.
-        self.HLT = 0b00000001
-        self.LDI = 0b10000010
-        self.PRN = 0b01000111
-        self.ADD = 0b10100000
-        self.MUL = 0b10100010
+        # The branchtable.
+        self.branchtable = {
+            0b00000001: self.HLT,
+            0b10000010: self.LDI,
+            0b01000111: self.PRN,
+            0b10100000: self.ADD,
+            0b10100010: self.MUL,
+            0b01000101: self.PUSH,
+            0b01000110: self.POP
+        }
 
     # Memory Address Register
     def ram_read(self, MAR):
@@ -28,26 +33,53 @@ class CPU:
     def ram_write(self, MAR, MDR):
         self.ram[MAR] = MDR
 
+    def HLT(self, operand_a, operand_b):
+        self.running = False
+        self.pc += 1
+
+    def LDI(self, operand_a, operand_b):
+        self.reg[operand_a] = operand_b
+        self.pc += 3
+
+    def PRN(self, operand_a, operand_b):
+        num = self.reg[int(str(operand_a))]
+        print(num)
+        self.pc += 2
+
+    def ADD(self, operand_a, operand_b):
+        self.alu("ADD", operand_a, operand_b)
+        self.pc += 3
+
+    def MUL(self, operand_a, operand_b):
+        self.alu("MUL", operand_a, operand_b)
+        self.pc += 3
+
+    def PUSH(self, operand_a, operand_b):
+        # Grab reg_index from memory and grab the value from register.
+        reg_index = self.ram[self.pc + 1]
+        value = self.reg[reg_index]
+
+        # Decrement the pointer.
+        self.reg[reg_index] -= 1
+
+        # Insert the value onto the stack, find the value of the SP in RAM.
+        self.ram[self.reg[self.sp]] = value
+        self.pc += 2
+
+    def POP(self, operand_a, operand_b):
+        # Grab reg_index from memory and set the value with the SP in RAM.
+        reg_index = self.ram[self.pc + 1]
+        value = self.ram[self.reg[self.sp]]
+
+        # Take the value from the stack and put it in register.
+        self.reg[reg_index] = value
+
+        # Increment SP.
+        self.reg[self.sp] += 1
+        self.pc += 2
+
     def load(self, filename):
         """Load a program into memory."""
-
-        """ For now, we've just hardcoded a program:
-
-        # program = [
-        #     # 0b prefix denotes binary
-        #     # From print8.ls8
-        #     self.LDI, # LDI R0,8
-        #     0b00000000,
-        #     0b00001000,
-        #     self.PRN, # PRN R0
-        #     0b00000000,
-        #     self.HLT, # HLT
-        # ]
-
-        # for instruction in program:
-        #     self.ram[address] = instruction
-             address += 1
-        """
 
         try:
             address = 0
@@ -106,19 +138,4 @@ class CPU:
             operand_a = self.ram_read(self.pc + 1)
             operand_b = self.ram_read(self.pc + 2)
 
-            if IR == self.ADD:
-                self.alu("ADD", operand_a, operand_b)
-                self.pc += 3
-            if IR == self.MUL:
-                self.alu("MUL", operand_a, operand_b)
-                self.pc += 3
-            elif IR == self.HLT:
-                self.running = False
-                self.pc += 1
-            elif IR == self.LDI:
-                self.reg[operand_a] = operand_b
-                self.pc += 3
-            elif IR == self.PRN:
-                num = self.reg[int(str(operand_a))]
-                print(num)
-                self.pc += 2
+            self.branchtable[IR](operand_a, operand_b)
