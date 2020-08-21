@@ -10,7 +10,7 @@ class CPU:
         self.ram = [0] * 256 # The memory storage for the RAM.
         self.reg = [0] * 8   # 8 new registers.
         self.pc = 0          # The program counter.
-        self.sp = 7          # Stack pointer.
+        self.sp = 7          # Stack counter.
         self.op_size = 1
         self.running = True
 
@@ -22,7 +22,9 @@ class CPU:
             0b10100000: self.ADD,
             0b10100010: self.MUL,
             0b01000101: self.PUSH,
-            0b01000110: self.POP
+            0b01000110: self.POP,
+            0b01010000: self.CALL,
+            0b00010001: self.RET
         }
 
     # Memory Address Register
@@ -77,6 +79,21 @@ class CPU:
         # Increment SP.
         self.reg[self.sp] += 1
         self.pc += 2
+    
+    def CALL(self, operand_a, operand_b):
+        # Decrement SP
+        self.reg[self.sp] -= 1   
+
+        # Push the return address to stack.
+        self.ram[self.reg[self.sp]] = self.pc + 2
+
+        # Set the PC to the subroutine address.
+        reg_index = self.ram[self.pc + 1]
+        self.pc = self.reg[reg_index]
+
+    def RET(self, operand_a, operand_b):
+        self.pc = self.ram[self.reg[self.sp]]
+        self.reg[self.sp] += 1
 
     def load(self, filename):
         """Load a program into memory."""
@@ -131,8 +148,6 @@ class CPU:
     def run(self):
         """Run the CPU."""
         # FETCH, DECODE, EXECUTE
-        self.trace()
-
         while self.running:
             IR = self.ram_read(self.pc) # Instruction Register.
             operand_a = self.ram_read(self.pc + 1)
